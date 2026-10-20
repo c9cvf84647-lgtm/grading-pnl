@@ -13,8 +13,10 @@ export interface Store {
   hdel(key: string, field: string): Promise<void>;
 }
 
-const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+// Vercel names these after the prefix chosen when connecting the database (KV_ or STORAGE_)
+const env = process.env;
+const url = env.KV_REST_API_URL || env.STORAGE_REST_API_URL || env.UPSTASH_REDIS_REST_URL;
+const token = env.KV_REST_API_TOKEN || env.STORAGE_REST_API_TOKEN || env.UPSTASH_REDIS_REST_TOKEN;
 
 function redisStore(redis: Redis): Store {
   return {
