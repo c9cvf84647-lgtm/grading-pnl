@@ -488,7 +488,7 @@ function Editor({
                 id="fName"
                 ref={nameRef}
                 value={f.name}
-                placeholder="Start typing, like charizard 69"
+                placeholder="Start typing, like charizard 69 or pikachu japanese promo"
                 autoComplete="off"
                 role="combobox"
                 aria-autocomplete="list"
