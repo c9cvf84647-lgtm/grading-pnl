@@ -16,17 +16,52 @@ function splitName(productName: string) {
   return m ? { name: m[1], number: m[2] } : { name: productName, number: "" };
 }
 
+type RawHit = { id: string; productName: string; consoleName: string; image: string };
+
+const toHit = (p: RawHit): SearchHit => ({ id: p.id, ...splitName(p.productName), set: cleanSet(p.consoleName), image: p.image });
+
+// PriceCharting's JSON search, with the regular HTML results page as a fallback
+// in case the JSON endpoint refuses requests from the hosting provider.
 export async function searchCards(q: string): Promise<SearchHit[]> {
-  const url = `${BASE}/search-products?type=prices&format=json&q=${encodeURIComponent(q)}`;
-  const res = await fetch(url, { headers: HEADERS, next: { revalidate: 3600 } });
+  const path = `${BASE}/search-products?type=prices&q=${encodeURIComponent(q)}`;
+  try {
+    const res = await fetch(path + "&format=json", { headers: HEADERS, cache: "no-store" });
+    if (!res.ok) throw new Error("status " + res.status);
+    const data = (await res.json()) as {
+      products?: { id: string; productName: string; consoleName: string; category: string; imageUri?: string }[];
+    };
+    const hits = (data.products || [])
+      .filter((p) => p.category === "pokemon-cards")
+      .slice(0, 12)
+      .map((p) => toHit({ ...p, image: p.imageUri || "" }));
+    if (hits.length) return hits;
+    throw new Error("no results");
+  } catch (e) {
+    console.error("PriceCharting JSON search failed, trying HTML:", (e as Error).message);
+  }
+
+  const res = await fetch(path, { headers: { ...HEADERS, Accept: "text/html" }, cache: "no-store" });
   if (!res.ok) throw new Error("search failed: " + res.status);
-  const data = (await res.json()) as {
-    products?: { id: string; productName: string; consoleName: string; category: string; imageUri?: string }[];
-  };
-  return (data.products || [])
-    .filter((p) => p.category === "pokemon-cards")
-    .slice(0, 12)
-    .map((p) => ({ id: p.id, ...splitName(p.productName), set: cleanSet(p.consoleName), image: p.imageUri || "" }));
+  const html = await res.text();
+
+  // A single exact match redirects straight to that card's page
+  if (/\/game\//.test(res.url) && html.includes('id="full-prices"')) {
+    const id = html.match(/data-product-id="(\d+)"/)?.[1] || html.match(/id="product_id"[^>]*value="(\d+)"/)?.[1];
+    return id ? [await getProduct(id)] : [];
+  }
+
+  const hits: SearchHit[] = [];
+  for (const row of html.split('<tr id="product-').slice(1)) {
+    const id = row.match(/^(\d+)/)?.[1];
+    const href = row.match(/href="https:\/\/www\.pricecharting\.com\/game\/(pokemon-[^"/]*)\//)?.[1];
+    const title = row.match(/<td class="title">\s*<a[^>]*>\s*([^<]+?)\s*<\/a>/)?.[1];
+    const set = row.match(/<td class="console[^"]*">\s*<a[^>]*>\s*([^<]+?)\s*<\/a>/)?.[1];
+    if (!id || !href || !title) continue;
+    const img = row.match(/src="(https:\/\/storage\.googleapis\.com\/images\.pricecharting\.com\/[^"]+?)\/60\.jpg"/)?.[1];
+    hits.push(toHit({ id, productName: decode(title), consoleName: decode(set || ""), image: img ? img + "/240.jpg" : "" }));
+    if (hits.length >= 12) break;
+  }
+  return hits;
 }
 
 const decode = (s: string) =>

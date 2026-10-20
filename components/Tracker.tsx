@@ -391,8 +391,8 @@ function Editor({
       try {
         const d = await api<{ results: Hit[] }>("/api/search?q=" + encodeURIComponent(q));
         if (seq === searchSeq.current) { setHits(d.results); setActive(-1); }
-      } catch {
-        if (seq === searchSeq.current) setHits([]);
+      } catch (e) {
+        if (seq === searchSeq.current) { setHits([]); setLookup((e as Error).message); }
       } finally {
         if (seq === searchSeq.current) setSearching(false);
       }
