@@ -301,7 +301,7 @@ export default function Tracker({ premium, account }: { premium: boolean; accoun
             <div className="tile hero">
               <span className="k">Overall PnL</span>
               <span className={"v " + tone(totals.pnl)}>{signed(totals.pnl)}</span>
-              <span className="d">Market value − price in − grading{premium ? " (sale price for sold cards)" : ""}</span>
+              <span className="d">Market value − price in − grading cost</span>
             </div>
             <div className="tile">
               <span className="k">Gross profit</span>
