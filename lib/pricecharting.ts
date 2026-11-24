@@ -153,7 +153,7 @@ export type Estimate = {
 
 const DAY = 86_400_000;
 const HALF_LIFE_DAYS = 60; // a sale two months old counts half as much as one today
-const MAX_AGE_DAYS = 183; // about 6 months; older sales are ignored for the estimate
+const MAX_AGE_DAYS = 365; // older sales are ignored for the estimate
 const MAX_SALES = 5;
 
 // Sales whose title names this exact company and grade, e.g. "PSA 3" but not "PSA 3.5" or "CGC 3".
@@ -183,7 +183,7 @@ export function recentValue(sales: Sale[], now = Date.now()): number | null {
   return weighted[weighted.length - 1].price;
 }
 
-// Market value for a slab: recent sold listings when there are any in the last 6 months,
+// Market value for a slab: recent sold listings when there are any in the last year,
 // otherwise PriceCharting's price guide. PriceCharting's guide for thin grades can lag
 // far behind the market (one old cheap sale keeps it low for months).
 export function estimateFor(p: Pick<Product, "prices" | "sales">, company: string, grade: string, now = Date.now()): Estimate {
