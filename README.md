@@ -6,7 +6,7 @@ the grading company and grade you choose.
 
 - Free accounts (email + password), each with its own private card list
 - Premium accounts get the **Exit** column (sale price) and realized vs unrealized PnL
-- Prices and photos come from PriceCharting. Market value is a recency weighted median of the last year's sold listings for that exact slab (e.g. PSA 3), falling back to PriceCharting's price guide when there are none. The last sale is shown under each price.
+- Prices and photos come from PriceCharting. Market value is a recency weighted median of the last 6 months' sold listings for that exact slab (e.g. PSA 3), falling back to PriceCharting's price guide when there are none. The last sale is shown under each price.
 
 ## Deploying on Vercel
 
