@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import seed from "@/data/seed-cards.json";
 import { ownerEmails, type User } from "./auth";
-import { getProduct, priceFor } from "./pricecharting";
+import { estimateFor, getProduct } from "./pricecharting";
 import { store } from "./store";
 
 export type Card = {
@@ -18,6 +18,7 @@ export type Card = {
   market: number;
   priceLabel: string;
   priceUpdatedAt: number;
+  lastSale: { price: number; date: string } | null;
   exit: number | null;
   createdAt: number;
   updatedAt: number;
@@ -30,6 +31,13 @@ const str = (v: unknown, max = 200) => (typeof v === "string" ? v.trim().slice(0
 const money = (v: unknown) => {
   const n = typeof v === "number" ? v : parseFloat(String(v ?? ""));
   return isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : 0;
+};
+const lastSaleOf = (v: unknown): Card["lastSale"] => {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const date = str(o.date, 10);
+  const price = money(o.price);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) && price > 0 ? { price, date } : null;
 };
 const imageUrl = (v: unknown) => {
   const s = str(v, 500);
@@ -57,6 +65,7 @@ export function cleanCard(input: Record<string, unknown>, premium: boolean, prev
     market: money(input.market),
     priceLabel: str(input.priceLabel, 40),
     priceUpdatedAt: typeof input.priceUpdatedAt === "number" ? input.priceUpdatedAt : prev?.priceUpdatedAt || 0,
+    lastSale: "lastSale" in input ? lastSaleOf(input.lastSale) : prev?.lastSale ?? null,
     exit,
     createdAt: prev?.createdAt || now,
     updatedAt: now,
@@ -84,13 +93,14 @@ export async function refreshPrice(card: Card): Promise<Card> {
   if (!card.pcId) return card;
   try {
     const p = await getProduct(card.pcId);
-    const { label, price } = priceFor(p.prices, card.company, card.grade);
+    const { label, price, lastSale } = estimateFor(p, card.company, card.grade);
     return {
       ...card,
       image: card.image || p.image,
       market: price ?? card.market,
       priceLabel: price === null ? "" : label,
       priceUpdatedAt: price === null ? card.priceUpdatedAt : Date.now(),
+      lastSale,
     };
   } catch {
     return card;

@@ -16,9 +16,12 @@ export type Card = {
   market: number;
   priceLabel: string;
   priceUpdatedAt: number;
+  lastSale: LastSale;
   exit: number | null;
   createdAt: number;
 };
+
+type LastSale = { price: number; date: string } | null;
 
 type Hit = { id: string; name: string; number: string; set: string; image: string };
 
@@ -35,6 +38,7 @@ type Form = {
   market: string;
   priceLabel: string;
   priceUpdatedAt: number;
+  lastSale: LastSale;
   exit: string;
 };
 
@@ -54,18 +58,21 @@ const num = (v: string | number | null | undefined) => {
   return isFinite(n) ? n : 0;
 };
 const tone = (n: number) => (n > 0 ? "pos" : n < 0 ? "neg" : "");
+const saleDate = (d: string) =>
+  new Date(d + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+const lastSaleText = (s: LastSale) => (s ? `Last sale ${fmt(s.price)} · ${saleDate(s.date)}` : "");
 const valueOf = (c: { market: number; exit: number | null }) => (c.exit !== null ? c.exit : c.market);
 const pnlOf = (c: Card) => valueOf(c) - c.cost - c.grading;
 
 const emptyForm = (): Form => ({
   pcId: "", name: "", number: "", set: "", image: "", cost: "", grading: "", company: "PSA", grade: "",
-  market: "", priceLabel: "", priceUpdatedAt: 0, exit: "",
+  market: "", priceLabel: "", priceUpdatedAt: 0, lastSale: null, exit: "",
 });
 
 const toForm = (c: Card): Form => ({
   pcId: c.pcId, name: c.name, number: c.number, set: c.set, image: c.image, cost: String(c.cost || ""),
   grading: String(c.grading || ""), company: c.company, grade: c.grade, market: String(c.market || ""),
-  priceLabel: c.priceLabel, priceUpdatedAt: c.priceUpdatedAt, exit: c.exit === null ? "" : String(c.exit),
+  priceLabel: c.priceLabel, priceUpdatedAt: c.priceUpdatedAt, lastSale: c.lastSale ?? null, exit: c.exit === null ? "" : String(c.exit),
 });
 
 function priceLinks(c: { name: string; number: string; company: string; grade: string }) {
@@ -253,6 +260,7 @@ export default function Tracker({ premium, account }: { premium: boolean; accoun
                     <td className="num">
                       {fmt(c.market)}
                       {c.priceLabel && <span className="src">{c.priceLabel}</span>}
+                      {c.lastSale && <span className="src">{lastSaleText(c.lastSale)}</span>}
                     </td>
                     {exitCols && (
                       <td className="num">
@@ -381,7 +389,7 @@ function Editor({
 
   // Type-ahead: waits for a short pause in typing, then asks the server
   function onNameInput(value: string) {
-    set({ name: value, pcId: "", image: "", priceLabel: "" });
+    set({ name: value, pcId: "", image: "", priceLabel: "", lastSale: null });
     const q = value.trim();
     const seq = ++searchSeq.current;
     if (q.length < 2) { setHits(null); return; }
@@ -404,7 +412,7 @@ function Editor({
     const seq = ++priceSeq.current;
     setLookup("Looking up market price…");
     try {
-      const d = await api<{ product: { image: string; set: string }; label: string; price: number | null }>(
+      const d = await api<{ product: { image: string; set: string }; label: string; price: number | null; lastSale: LastSale }>(
         `/api/price?id=${pcId}&company=${encodeURIComponent(company)}&grade=${encodeURIComponent(grade)}`,
       );
       if (seq !== priceSeq.current) return;
@@ -414,8 +422,13 @@ function Editor({
         market: d.price === null ? prev.market : String(d.price),
         priceLabel: d.price === null ? "" : d.label,
         priceUpdatedAt: d.price === null ? prev.priceUpdatedAt : Date.now(),
+        lastSale: d.lastSale,
       }));
-      setLookup(d.price === null ? `No ${d.label} sales on record yet. Enter the market price yourself.` : `Market price: ${d.label} on PriceCharting.`);
+      setLookup(
+        d.price === null
+          ? `No ${d.label} sales on record yet. Enter the market price yourself.`
+          : `Market price: ${d.label} on PriceCharting.` + (d.lastSale ? ` ${lastSaleText(d.lastSale)}.` : ""),
+      );
     } catch (e) {
       if (seq === priceSeq.current) setLookup((e as Error).message);
     }
